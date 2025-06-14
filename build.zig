@@ -6,32 +6,40 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     // modules
-    const lib_mod = b.createModule(.{
-        .root_source_file = b.path("lib/root.zig"),
+    const libhttp = b.createModule(.{
+        .root_source_file = b.path("lib/http.zig"),
         .target = target,
         .optimize = optimize,
     });
-    const exe_mod = b.createModule(.{
+    const liburi = b.createModule(.{
+        .root_source_file = b.path("lib/uri.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const httpd = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
-        .imports = &.{.{
-            .name = "http",
-            .module = lib_mod,
-        }},
+        .imports = &.{
+            .{ .name = "http", .module = libhttp },
+            .{ .name = "uri", .module = liburi },
+        },
     });
 
     // compilation
-    const lib = b.addLibrary(.{
+    b.installArtifact(b.addLibrary(.{
         .linkage = .static,
         .name = "http",
-        .root_module = lib_mod,
-    });
-    b.installArtifact(lib);
-
+        .root_module = libhttp,
+    }));
+    b.installArtifact(b.addLibrary(.{
+        .linkage = .static,
+        .name = "uri",
+        .root_module = liburi,
+    }));
     const exe = b.addExecutable(.{
         .name = "httpd",
-        .root_module = exe_mod,
+        .root_module = httpd,
     });
     b.installArtifact(exe);
 
@@ -43,6 +51,6 @@ pub fn build(b: *std.Build) void {
     run_step.dependOn(&run_cmd.step);
 
     const test_step = b.step("test", "Run unit tests");
-    test_step.dependOn(&b.addRunArtifact(b.addTest(.{ .root_module = lib_mod })).step);
-    test_step.dependOn(&b.addRunArtifact(b.addTest(.{ .root_module = exe_mod })).step);
+    test_step.dependOn(&b.addRunArtifact(b.addTest(.{ .root_module = libhttp })).step);
+    test_step.dependOn(&b.addRunArtifact(b.addTest(.{ .root_module = httpd })).step);
 }
